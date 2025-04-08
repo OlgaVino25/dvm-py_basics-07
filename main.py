@@ -2,6 +2,9 @@ import os
 from dotenv import load_dotenv
 import pytimeparse
 import ptbot
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def render_progressbar(
@@ -20,46 +23,32 @@ def render_progressbar(
     return '{0} |{1}| {2}% {3}'.format(prefix, pbar, percent, suffix)
 
 
-def create_notify_progress(bot, total_seconds):
-    def notify_progress(secs_left, chat_id, message_id):
+class TimerCallbacks:
+    def __init__(self, bot, total_seconds=None, chat_id=None, message_id=None):
+        self.bot = bot
+        self.total_seconds = total_seconds
+        self.chat_id = chat_id
+        self.message_id = message_id
+
+    def notify_progress(self, secs_left):
         progress_bar = render_progressbar(
-            total=total_seconds,
-            iteration=total_seconds - secs_left,
+            total=self.total_seconds,
+            iteration=self.total_seconds - secs_left,
             length=20
         )
         message = f"Осталось: {secs_left}сек\n{progress_bar}"
-        bot.update_message(chat_id, message_id, message)
-    return notify_progress
+        self.bot.update_message(self.chat_id, self.message_id, message)
 
-
-def create_choose(bot):
-    def choose(chat_id, message_id):
-        bot.send_message(chat_id, "Время вышло!")
-    return choose
+    def choose(self):
+        self.bot.send_message(self.chat_id, "Время вышло!")
 
 
 def wait(bot, chat_id, text):
     seconds = pytimeparse.parse(text)
-    if seconds:
-        message_id = bot.send_message(
-            chat_id,
-            f"Таймер на: {text} запущен"
-        )
-        notify_progress = create_notify_progress(bot, seconds)
-        choose = create_choose(bot)
-
-        bot.create_countdown(
-            seconds,
-            notify_progress,
-            chat_id=chat_id,
-            message_id=message_id,
-        )
-        bot.create_timer(
-            seconds,
-            choose,
-            chat_id=chat_id,
-            message_id=message_id,
-        )
+    message_id = bot.send_message(chat_id, f"Таймер на: {text} запущен")
+    callbacks = TimerCallbacks(bot, seconds, chat_id, message_id)
+    bot.create_countdown(seconds, callbacks.notify_progress)
+    bot.create_timer(seconds, callbacks.choose)
 
 
 def main():
