@@ -27,9 +27,9 @@ def notify_progress(secs_left, chat_id, message_id, total_seconds, bot):
         length=20
     )
     message = f"""
-Осталось: {secs_left}сек
-{progress_bar}
-"""
+    Осталось: {secs_left}сек       
+    {progress_bar}
+    """
     bot.update_message(chat_id, message_id, message.strip())
 
 
