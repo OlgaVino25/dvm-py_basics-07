@@ -1,10 +1,10 @@
+import ptbot
 import os
 from dotenv import load_dotenv
 import pytimeparse
-import ptbot
-import logging
 
-logger = logging.getLogger(__name__)
+load_dotenv()
+tg_token = os.getenv("TG_TOKEN")
 
 
 def render_progressbar(
@@ -23,40 +23,47 @@ def render_progressbar(
     return '{0} |{1}| {2}% {3}'.format(prefix, pbar, percent, suffix)
 
 
-class TimerCallbacks:
-    def __init__(self, bot, total_seconds=None, chat_id=None, message_id=None):
-        self.bot = bot
-        self.total_seconds = total_seconds
-        self.chat_id = chat_id
-        self.message_id = message_id
-
-    def notify_progress(self, secs_left):
-        progress_bar = render_progressbar(
-            total=self.total_seconds,
-            iteration=self.total_seconds - secs_left,
-            length=20
-        )
-        message = f"Осталось: {secs_left}сек\n{progress_bar}"
-        self.bot.update_message(self.chat_id, self.message_id, message)
-
-    def choose(self):
-        self.bot.send_message(self.chat_id, "Время вышло!")
+def notify_progress(secs_left, chat_id, message_id, total_seconds):
+    progress_bar = render_progressbar(
+        total=total_seconds,
+        iteration=total_seconds - secs_left,
+        length=20
+    )
+    message = f"""
+Осталось: {secs_left}сек
+{progress_bar}
+"""
+    bot.update_message(chat_id, message_id, message.strip())
 
 
-def wait(bot, chat_id, text):
+def choose(chat_id, message_id):
+    bot.send_message(chat_id, "Время вышло!")
+
+
+def wait(chat_id, text):
     seconds = pytimeparse.parse(text)
-    message_id = bot.send_message(chat_id, f"Таймер на: {text} запущен")
-    callbacks = TimerCallbacks(bot, seconds, chat_id, message_id)
-    bot.create_countdown(seconds, callbacks.notify_progress)
-    bot.create_timer(seconds, callbacks.choose)
+    if seconds:
+        message_id = bot.send_message(chat_id, f"Таймер на: {text} запущен")
+        bot.create_countdown(
+            seconds,
+            notify_progress,
+            chat_id=chat_id,
+            message_id=message_id,
+            total_seconds=seconds
+        )
+        bot.create_timer(
+            seconds,
+            choose,
+            chat_id=chat_id,
+            message_id=message_id
+        )
 
 
 def main():
-    load_dotenv()
-    tg_token = os.getenv("TG_TOKEN")
+    global bot
 
     bot = ptbot.Bot(tg_token)
-    bot.reply_on_message(lambda chat_id, text: wait(bot, chat_id, text))
+    bot.reply_on_message(wait)
     bot.run_bot()
 
 
